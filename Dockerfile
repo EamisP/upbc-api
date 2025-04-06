@@ -1,28 +1,44 @@
-FROM python:3.10-slim
+FROM python:3.11
 
-# Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
     wget \
-    unzip \
     curl \
+    unzip \
     gnupg \
-    chromium-driver \
-    chromium \
-    && apt-get clean
+    libglib2.0-0 \
+    libnss3 \
+    libgconf-2-4 \
+    libxi6 \
+    libxcursor1 \
+    libxcomposite1 \
+    libasound2 \
+    libxdamage1 \
+    libxrandr2 \
+    libgtk-3-0 \
+    libgbm-dev \
+    libxshmfence-dev \
+    libxss1 \
+    libxtst6 \
+    fonts-liberation \
+    libappindicator1 \
+    libappindicator3-1 \
+    xdg-utils
 
-# Variables de entorno para Chrome
-ENV CHROME_BIN="/usr/bin/chromium" \
-    PATH="$PATH:/usr/bin/chromium"
+# Instalar Google Chrome
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt install -y ./google-chrome-stable_current_amd64.deb && \
+    rm google-chrome-stable_current_amd64.deb
 
-# Copiar archivos del proyecto
+# ChromeDriver
+RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+') && \
+    wget https://chromedriver.storage.googleapis.com/$CHROME_VERSION/chromedriver_linux64.zip && \
+    unzip chromedriver_linux64.zip && \
+    mv chromedriver /usr/bin/chromedriver && \
+    chmod +x /usr/bin/chromedriver && \
+    rm chromedriver_linux64.zip
+
 WORKDIR /app
-COPY . .
+COPY . /app
+RUN pip install -r requirements.txt
 
-# Instalar dependencias de Python
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Exponer el puerto Flask
-EXPOSE 10000
-
-# Ejecutar la app
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
+CMD ["python", "app.py"]
