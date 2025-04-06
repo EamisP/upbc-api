@@ -5,10 +5,10 @@ from selenium.webdriver.chrome.options import Options
 
 app = Flask(__name__)
 
-@app.route('/login', methods=['POST'])
+@app.route("/login", methods=["POST"])
 def login():
-    user = request.json.get('user')
-    password = request.json.get('pass')
+    user = request.json.get("user")
+    password = request.json.get("pass")
 
     if not user or not password:
         return jsonify({"error": "Faltan datos"}), 400
@@ -20,7 +20,6 @@ def login():
         chrome_options.add_argument("--disable-dev-shm-usage")
 
         driver = webdriver.Chrome(options=chrome_options)
-
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
         driver.find_element(By.ID, "ContentPlaceHolder1_tb_usr").send_keys(user)
         driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass").send_keys(password)
@@ -31,5 +30,6 @@ def login():
         driver.quit()
 
         return jsonify({"status": "ok", "nombre": name})
+
     except Exception as e:
         return jsonify({"status": "fail", "error": str(e)}), 500
