@@ -10,16 +10,13 @@ def login():
     user = request.json.get("user")
     password = request.json.get("pass")
 
-    if not user or not password:
-        return jsonify({"error": "Faltan datos"}), 400
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
     try:
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-
-        driver = webdriver.Chrome(options=chrome_options)
+        driver = webdriver.Chrome(options=options)
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
         driver.find_element(By.ID, "ContentPlaceHolder1_tb_usr").send_keys(user)
         driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass").send_keys(password)
@@ -30,6 +27,8 @@ def login():
         driver.quit()
 
         return jsonify({"status": "ok", "nombre": name})
-
     except Exception as e:
-        return jsonify({"status": "fail", "error": str(e)}), 500
+        return jsonify({"status": "fail", "error": str(e)})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
