@@ -7,9 +7,11 @@ import time
 from selenium.webdriver.chrome.options import Options
 
 options = Options()
-service = Service(executable_path="/usr/local/bin/chromedriver")
-driver = webdriver.Chrome(service=service)
 options.add_argument("--headless")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--user-data-dir=/tmp/chrome-user-data")  # Directorio único para los datos del usuario
+service = Service(executable_path="/usr/local/bin/chromedriver")
 driver = webdriver.Chrome(service=service, options=options)
 
 try:
