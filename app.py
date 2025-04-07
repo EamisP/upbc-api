@@ -29,7 +29,7 @@ def login():
     try:
         # Abrir la página de la escuela
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 3)
         
         # Completar el formulario de login
         username_field = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr")))
