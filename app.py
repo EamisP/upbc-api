@@ -6,6 +6,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
+import tempfile
+import shutil
 
 app = Flask(__name__)
 
@@ -16,12 +18,15 @@ def login():
     username = data.get('username')
     password = data.get('password')
     
-    # Configurar Chrome en modo headless con un directorio único de usuario
+    # Crear un directorio temporal único para el perfil de Chrome
+    temp_dir = tempfile.mkdtemp()
+    
+    # Configurar Chrome en modo headless con el directorio temporal
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--user-data-dir=/tmp/chrome-user-data")
+    options.add_argument(f"--user-data-dir={temp_dir}")
     
     service = Service(executable_path="/usr/local/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
@@ -41,7 +46,7 @@ def login():
         submit_button = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar")))
         submit_button.click()
         
-        # Esperar a que se muestre el elemento con el name y dar tiempo adicional para que carguen todos los datos
+        # Esperar a que se muestre el elemento con el nombre y dar tiempo adicional para cargar datos
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lb_lnom")))
         time.sleep(1)
         
@@ -73,8 +78,10 @@ def login():
         return jsonify({"error": str(e)}), 500
     finally:
         driver.quit()
+        # Eliminar el directorio temporal creado
+        shutil.rmtree(temp_dir)
     
-    # Armar la respuesta completa con todos los datos agrupados
+    # Armar la respuesta completa con los datos extraídos
     result = {
         "personal": personal,
         "address": address,
