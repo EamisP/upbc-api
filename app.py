@@ -1,0 +1,59 @@
+from flask import Flask, request, jsonify
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+
+app = Flask(__name__)
+
+@app.route('/login', methods=['POST'])
+def login():
+    # Recibir datos en formato JSON
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    
+    # Configurar Chrome en modo headless con un directorio único de usuario
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--user-data-dir=/tmp/chrome-user-data")
+    
+    service = Service(executable_path="/usr/local/bin/chromedriver")
+    driver = webdriver.Chrome(service=service, options=options)
+    
+    try:
+        # Abrir la página de la escuela
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
+        wait = WebDriverWait(driver, 10)
+        
+        # Esperar y completar el formulario de login
+        username_field = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr")))
+        password_field = driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass")
+        username_field.send_keys(username)
+        password_field.send_keys(password)
+        
+        # Hacer clic en el botón de acceso
+        submit_button = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar")))
+        submit_button.click()
+        
+        # Esperar a que se muestre el elemento con el nombre del alumno
+        wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lb_lnom")))
+        time.sleep(3)  # Espera adicional para asegurar que la página cargue completamente
+        
+        # Extraer el "name"
+        name = driver.find_element(By.ID, "ContentPlaceHolder1_lb_lnom").text
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        driver.quit()
+    
+    return jsonify({"name": name})
+
+if __name__ == '__main__':
+    # Render espera que la aplicación escuche en el puerto 8080
+    app.run(host='0.0.0.0', port=8080)
