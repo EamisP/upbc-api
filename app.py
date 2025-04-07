@@ -31,7 +31,7 @@ def login():
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
         wait = WebDriverWait(driver, 10)
         
-        # Esperar y completar el formulario de login
+        # Completar el formulario de login
         username_field = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr")))
         password_field = driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass")
         username_field.send_keys(username)
@@ -41,18 +41,48 @@ def login():
         submit_button = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar")))
         submit_button.click()
         
-        # Esperar a que se muestre el elemento con el nombre del alumno
+        # Esperar a que se muestre el elemento con el name y dar tiempo adicional para que carguen todos los datos
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lb_lnom")))
-        time.sleep(3)  # Espera adicional para asegurar que la página cargue completamente
+        time.sleep(3)
         
-        # Extraer el "name"
-        name = driver.find_element(By.ID, "ContentPlaceHolder1_lb_lnom").text
+        # Extraer los datos:
+        personal = {
+            "name": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lnom").text,
+            "career": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lprog").text
+        }
+        
+        address = {
+            "dir": driver.find_element(By.ID, "ContentPlaceHolder1_lb_ldir").text,
+            "col": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lcol").text,
+            "mun": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lmun").text,
+            "edo": driver.find_element(By.ID, "ContentPlaceHolder1_lb_ledo").text,
+            "cp": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lcp").text
+        }
+        
+        tutor = {
+            "name": driver.find_element(By.ID, "ContentPlaceHolder1_lb_tutor").text,
+            "mail": driver.find_element(By.ID, "ContentPlaceHolder1_lbmemail").text
+        }
+        
+        institution = {
+            "mail": driver.find_element(By.ID, "ContentPlaceHolder1_lb_inst_email").text,
+            "password": driver.find_element(By.ID, "ContentPlaceHolder1_lb_inst_clave").text
+        }
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         driver.quit()
     
-    return jsonify({"name": name})
+    # Armar la respuesta completa con todos los datos agrupados
+    result = {
+        "personal": personal,
+        "address": address,
+        "tutor": tutor,
+        "institution": institution
+    }
+    
+    return jsonify(result)
 
 if __name__ == '__main__':
     # Render espera que la aplicación escuche en el puerto 8080
