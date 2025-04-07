@@ -7,7 +7,7 @@ import time
 from selenium.webdriver.chrome.options import Options
 
 options = Options()
-service = Service(executable_path="chromedriver.exe")
+service = Service(executable_path="/usr/local/bin/chromedriver")
 driver = webdriver.Chrome(service=service)
 options.add_argument("--headless")
 driver = webdriver.Chrome(service=service, options=options)
