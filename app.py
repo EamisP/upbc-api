@@ -146,34 +146,38 @@ def login():
                 continue  # Si hay error con alguna materia, continuar con la siguiente
         
         # 3. Procesar calificaciones especiales desde rpt_calificaciones.aspx para una materia (por ejemplo, inglés)
-        # Esta sección interactúa con el select "ctl00$ContentPlaceHolder1$dd_corte" y obtiene las calificaciones de las 3 unidades
-        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
-        wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
-        time.sleep(2)
-        
-        # Usando Selenium's Select para interactuar con el select
-        select_elem = Select(driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))
-        special_grades = []
-        
-        for corte in ["1", "2", "3"]:
-            select_elem.select_by_value(corte)
-            # Esperar a que se actualice la tabla
-            time.sleep(2)
+driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
+wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
+time.sleep(2)
+
+special_grades = []
+
+for corte in ["1", "2", "3"]:
+    # Volver a localizar el select para evitar que se vuelva obsoleto
+    select_elem = Select(wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))))
+    select_elem.select_by_value(corte)
+    
+    # Espera a que se actualice la tabla tras seleccionar el valor
+    time.sleep(2)
+    
+    try:
+        # Espera a que aparezca el TR que contenga la palabra "NIVEL" (ignorando mayúsculas/minúsculas)
+        tr_nivel = wait.until(EC.presence_of_element_located((
+            By.XPATH, 
+            "//tr[td[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'NIVEL')]]"
+        )))
+        tds = tr_nivel.find_elements(By.TAG_NAME, "td")
+        if tds:
+            grade_text = tds[-1].text.strip()
             try:
-                # Buscar el TR que contenga en alguno de sus TD la palabra "NIVEL"
-                tr_nivel = driver.find_element(By.XPATH, "//tr[td[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'NIVEL')]]")
-                tds = tr_nivel.find_elements(By.TAG_NAME, "td")
-                if tds:
-                    grade_text = tds[-1].text.strip()
-                    try:
-                        grade_val = float(grade_text) if grade_text != "" else 0.0
-                    except:
-                        grade_val = 0.0
-                    special_grades.append(grade_val)
-                else:
-                    special_grades.append(0.0)
-            except Exception as e:
-                special_grades.append(0.0)
+                grade_val = float(grade_text) if grade_text != "" else 0.0
+            except Exception:
+                grade_val = 0.0
+            special_grades.append(grade_val)
+        else:
+            special_grades.append(0.0)
+    except Exception as e:
+        special_grades.append(0.0)
         
         # Calcular la calificación final especial:
         # Si se obtuvieron tres calificaciones y cada una es mayor que 0, se promedian; de lo contrario se retorna "N/A"
