@@ -3,7 +3,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import tempfile
@@ -143,8 +143,57 @@ def login():
                     "unidades": unidades
                 })
             except Exception as e:
-                # Si hay error con alguna materia se ignora y continúa
-                continue
+                continue  # Si hay error con alguna materia, continuar con la siguiente
+        
+        # 3. Procesar calificaciones especiales desde rpt_calificaciones.aspx para una materia (por ejemplo, inglés)
+        # Esta sección interactúa con el select "ctl00$ContentPlaceHolder1$dd_corte" y obtiene las calificaciones de las 3 unidades
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
+        wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
+        time.sleep(2)
+        
+        # Usando Selenium's Select para interactuar con el select
+        select_elem = Select(driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))
+        special_grades = []
+        
+        for corte in ["1", "2", "3"]:
+            select_elem.select_by_value(corte)
+            # Esperar a que se actualice la tabla
+            time.sleep(2)
+            try:
+                # Buscar el TR que contenga en alguno de sus TD la palabra "NIVEL"
+                tr_nivel = driver.find_element(By.XPATH, "//tr[td[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'NIVEL')]]")
+                tds = tr_nivel.find_elements(By.TAG_NAME, "td")
+                if tds:
+                    grade_text = tds[-1].text.strip()
+                    try:
+                        grade_val = float(grade_text) if grade_text != "" else 0.0
+                    except:
+                        grade_val = 0.0
+                    special_grades.append(grade_val)
+                else:
+                    special_grades.append(0.0)
+            except Exception as e:
+                special_grades.append(0.0)
+        
+        # Calcular la calificación final especial:
+        # Si se obtuvieron tres calificaciones y cada una es mayor que 0, se promedian; de lo contrario se retorna "N/A"
+        if len(special_grades) == 3 and all(g > 0 for g in special_grades):
+            special_final = round(sum(special_grades) / 3, 2)
+            special_final_str = str(special_final)
+        else:
+            special_final_str = "N/A"
+        
+        # Crear el diccionario para la materia especial (por ejemplo, "INGLÉS")
+        special_subject = {
+            "materia": "INGLÉS",
+            "calificacion_final": special_final_str,
+            "unidades": [
+                {"unidad": "1", "descripcion": "Calificación corte 1", "calificacion": str(special_grades[0]) if len(special_grades) > 0 else "N/A"},
+                {"unidad": "2", "descripcion": "Calificación corte 2", "calificacion": str(special_grades[1]) if len(special_grades) > 1 else "N/A"},
+                {"unidad": "3", "descripcion": "Calificación corte 3", "calificacion": str(special_grades[2]) if len(special_grades) > 2 else "N/A"}
+            ]
+        }
+        subjects_data.append(special_subject)
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
