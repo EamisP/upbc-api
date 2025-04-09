@@ -36,24 +36,21 @@ def login():
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
         wait = WebDriverWait(driver, 10)
         
-        # Completar el formulario de login
         username_field = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr")))
         password_field = driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass")
         username_field.send_keys(username)
         password_field.send_keys(password)
         
-        # Hacer clic en el botón de acceso y esperar a que la página se cargue
         submit_button = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar")))
         submit_button.click()
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lb_lnom")))
         time.sleep(1)
         
-        # Extraer datos básicos
+        # Datos básicos
         personal = {
             "name": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lnom").text,
             "career": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lprog").text
         }
-        
         address = {
             "dir": driver.find_element(By.ID, "ContentPlaceHolder1_lb_ldir").text,
             "col": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lcol").text,
@@ -61,18 +58,16 @@ def login():
             "edo": driver.find_element(By.ID, "ContentPlaceHolder1_lb_ledo").text,
             "cp": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lcp").text
         }
-        
         tutor = {
             "name": driver.find_element(By.ID, "ContentPlaceHolder1_lb_tutor").text,
             "mail": driver.find_element(By.ID, "ContentPlaceHolder1_lbmemail").text
         }
-        
         institution = {
             "mail": driver.find_element(By.ID, "ContentPlaceHolder1_lb_inst_email").text,
             "password": driver.find_element(By.ID, "ContentPlaceHolder1_lb_inst_clave").text
         }
         
-        # Extraer la boleta (tabla existente)
+        # Extraer la boleta
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv_hrsxsem")))
         tabla = driver.find_element(By.ID, "ContentPlaceHolder1_gv_hrsxsem")
         filas = tabla.find_elements(By.TAG_NAME, "tr")
@@ -88,38 +83,29 @@ def login():
         
         # 2. Navegar a la página de materias y extraer la información adicional
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/npe_alu_materias.aspx")
-        # Esperar a que aparezcan los enlaces de las materias
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[id^='ContentPlaceHolder1_gv1_lk_mat_desc_']")))
         time.sleep(2)
         
         subjects_data = []
-        # Se obtienen todos los enlaces de materias (el número puede variar)
         subject_links = driver.find_elements(By.CSS_SELECTOR, "a[id^='ContentPlaceHolder1_gv1_lk_mat_desc_']")
         num_subjects = len(subject_links)
         
         for i in range(num_subjects):
             try:
-                # Reubicar el enlace de la materia (para evitar referencias obsoletas)
+                # Reubicar y obtener el enlace actualizado
                 subject_link = driver.find_element(By.ID, f"ContentPlaceHolder1_gv1_lk_mat_desc_{i}")
                 subject_name = subject_link.text.strip()
                 
-                # Hacer click en el enlace de la materia y esperar 2 segundos
                 subject_link.click()
                 time.sleep(2)
                 
-                # Extraer la calificación final de la materia
                 final_grade_elem = driver.find_element(By.ID, f"ContentPlaceHolder1_gv1_lb_califfinal_{i}")
                 final_grade = final_grade_elem.text.strip()
                 
-                # Inicializar lista para la información de las unidades
                 unidades = []
                 try:
-                    # Buscar el contenedor del detalle de unidades (si existe)
                     detail_div = driver.find_element(By.ID, f"ContentPlaceHolder1_gv1_dv_gv1x_{i}")
-                    # Dentro del contenedor, buscar la tabla de unidades
                     table = detail_div.find_element(By.CSS_SELECTOR, "table[id^='ContentPlaceHolder1_gv1_gv1x_']")
-                    
-                    # Obtener todas las filas excepto la de encabezado
                     rows = table.find_elements(By.XPATH, ".//tr[position()>1]")
                     for row in rows:
                         cells = row.find_elements(By.TAG_NAME, "td")
@@ -132,62 +118,51 @@ def login():
                                 "descripcion": descripcion,
                                 "calificacion": calificacion_unidad
                             })
-                except Exception as ex:
-                    # Si no se encuentra el detalle, se deja la lista vacía
+                except Exception:
                     unidades = []
                 
-                # Agregar los datos de la materia a la lista
                 subjects_data.append({
                     "materia": subject_name,
                     "calificacion_final": final_grade,
                     "unidades": unidades
                 })
-            except Exception as e:
-                continue  # Si hay error con alguna materia, continuar con la siguiente
+            except Exception:
+                continue
         
         # 3. Procesar calificaciones especiales desde rpt_calificaciones.aspx para una materia (por ejemplo, inglés)
-driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
-wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
-time.sleep(2)
-
-special_grades = []
-
-for corte in ["1", "2", "3"]:
-    # Volver a localizar el select para evitar que se vuelva obsoleto
-    select_elem = Select(wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))))
-    select_elem.select_by_value(corte)
-    
-    # Espera a que se actualice la tabla tras seleccionar el valor
-    time.sleep(2)
-    
-    try:
-        # Espera a que aparezca el TR que contenga la palabra "NIVEL" (ignorando mayúsculas/minúsculas)
-        tr_nivel = wait.until(EC.presence_of_element_located((
-            By.XPATH, 
-            "//tr[td[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'NIVEL')]]"
-        )))
-        tds = tr_nivel.find_elements(By.TAG_NAME, "td")
-        if tds:
-            grade_text = tds[-1].text.strip()
-            try:
-                grade_val = float(grade_text) if grade_text != "" else 0.0
-            except Exception:
-                grade_val = 0.0
-            special_grades.append(grade_val)
-        else:
-            special_grades.append(0.0)
-    except Exception as e:
-        special_grades.append(0.0)
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
+        wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
+        time.sleep(2)
         
-        # Calcular la calificación final especial:
-        # Si se obtuvieron tres calificaciones y cada una es mayor que 0, se promedian; de lo contrario se retorna "N/A"
+        special_grades = []
+        for corte in ["1", "2", "3"]:
+            # Volver a localizar el select para evitar elementos obsoletos
+            select_elem = Select(wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))))
+            select_elem.select_by_value(corte)
+            time.sleep(2)
+            try:
+                tr_nivel = wait.until(EC.presence_of_element_located((
+                    By.XPATH, "//tr[td[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'NIVEL')]]"
+                )))
+                tds = tr_nivel.find_elements(By.TAG_NAME, "td")
+                if tds:
+                    grade_text = tds[-1].text.strip()
+                    try:
+                        grade_val = float(grade_text) if grade_text != "" else 0.0
+                    except Exception:
+                        grade_val = 0.0
+                    special_grades.append(grade_val)
+                else:
+                    special_grades.append(0.0)
+            except Exception:
+                special_grades.append(0.0)
+        
         if len(special_grades) == 3 and all(g > 0 for g in special_grades):
             special_final = round(sum(special_grades) / 3, 2)
             special_final_str = str(special_final)
         else:
             special_final_str = "N/A"
         
-        # Crear el diccionario para la materia especial (por ejemplo, "INGLÉS")
         special_subject = {
             "materia": "INGLÉS",
             "calificacion_final": special_final_str,
@@ -205,7 +180,6 @@ for corte in ["1", "2", "3"]:
         driver.quit()
         shutil.rmtree(temp_dir)
     
-    # Combinar toda la información en el resultado final
     result = {
         "personal": personal,
         "address": address,
