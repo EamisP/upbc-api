@@ -34,7 +34,7 @@ def login():
     try:
         # Abrir la página de la escuela
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
-        wait = WebDriverWait(driver, 1)
+        wait = WebDriverWait(driver, 5)  # Aumentamos el tiempo de espera en caso de que la página tarde
         
         # Completar el formulario de login
         username_field = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr")))
@@ -50,7 +50,7 @@ def login():
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lb_lnom")))
         time.sleep(1)
         
-        # Extraer los datos:
+        # Extraer los datos personales, dirección, tutor e institución
         personal = {
             "name": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lnom").text,
             "career": driver.find_element(By.ID, "ContentPlaceHolder1_lb_lprog").text
@@ -74,6 +74,23 @@ def login():
             "password": driver.find_element(By.ID, "ContentPlaceHolder1_lb_inst_clave").text
         }
         
+        # Extraer los datos de la boleta (tabla) 
+        # Se espera a que la tabla esté presente en el DOM
+        wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv_hrsxsem")))
+        tabla = driver.find_element(By.ID, "ContentPlaceHolder1_gv_hrsxsem")
+        filas = tabla.find_elements(By.TAG_NAME, "tr")
+        
+        boleta = []
+        # Se asume que la primera fila es el encabezado
+        for fila in filas[1:]:
+            celdas = fila.find_elements(By.TAG_NAME, "td")
+            if len(celdas) >= 3:
+                boleta.append({
+                    "materia": celdas[0].text.strip(),
+                    "calificacion": celdas[1].text.strip(),
+                    "cuatrimestre": celdas[2].text.strip()
+                })
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -81,12 +98,13 @@ def login():
         # Eliminar el directorio temporal creado
         shutil.rmtree(temp_dir)
     
-    # Armar la respuesta completa con los datos extraídos
+    # Armar la respuesta completa con todos los datos extraídos
     result = {
         "personal": personal,
         "address": address,
         "tutor": tutor,
-        "institution": institution
+        "institution": institution,
+        "boleta": boleta
     }
     
     return jsonify(result)
