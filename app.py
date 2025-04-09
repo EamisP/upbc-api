@@ -67,7 +67,7 @@ def login():
             "password": driver.find_element(By.ID, "ContentPlaceHolder1_lb_inst_clave").text
         }
         
-        # Extraer la boleta
+        # Extraer la boleta (tabla existente)
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv_hrsxsem")))
         tabla = driver.find_element(By.ID, "ContentPlaceHolder1_gv_hrsxsem")
         filas = tabla.find_elements(By.TAG_NAME, "tr")
@@ -92,7 +92,6 @@ def login():
         
         for i in range(num_subjects):
             try:
-                # Reubicar y obtener el enlace actualizado
                 subject_link = driver.find_element(By.ID, f"ContentPlaceHolder1_gv1_lk_mat_desc_{i}")
                 subject_name = subject_link.text.strip()
                 
@@ -129,14 +128,13 @@ def login():
             except Exception:
                 continue
         
-        # 3. Procesar calificaciones especiales desde rpt_calificaciones.aspx para una materia (por ejemplo, inglés)
+        # 3. Procesar calificaciones especiales desde rpt_calificaciones.aspx
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
         wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
         time.sleep(2)
         
         special_grades = []
         for corte in ["1", "2", "3"]:
-            # Volver a localizar el select para evitar elementos obsoletos
             select_elem = Select(wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))))
             select_elem.select_by_value(corte)
             time.sleep(2)
@@ -174,6 +172,57 @@ def login():
         }
         subjects_data.append(special_subject)
         
+        # 4. Obtener el horario de los alumnos desde alu_horario.aspx
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/alu_horario.aspx")
+        wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv_hrsxsem")))
+        time.sleep(2)
+        
+        horario = []
+        horario_tabla = driver.find_element(By.ID, "ContentPlaceHolder1_gv_hrsxsem")
+        rows = horario_tabla.find_elements(By.TAG_NAME, "tr")
+        # Suponemos que la primera fila es el encabezado
+        for idx, row in enumerate(rows[1:]):
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 9:
+                # Obtener materia y maestro desde el segundo TD (índice 1)
+                try:
+                    materia_elem = cells[1].find_element(By.ID, f"ContentPlaceHolder1_gv_hrsxsem_lb_materia_{idx}")
+                    materia_text = materia_elem.text.strip()
+                except Exception:
+                    materia_text = cells[1].text.split("\n")[0].strip()
+                try:
+                    maestro_elem = cells[1].find_element(By.ID, f"ContentPlaceHolder1_gv_hrsxsem_lb_maestro_{idx}")
+                    maestro_text = maestro_elem.text.strip()
+                except Exception:
+                    # Si no se encuentra, se extrae de la parte siguiente del mismo TD
+                    parts = cells[1].text.split("\n")
+                    maestro_text = parts[1].strip() if len(parts) > 1 else ""
+                
+                grupo = cells[2].text.strip()
+                # Para el horario, cada celda puede tener &nbsp;; se limpia con strip() y se comprueba
+                def clean(cell):
+                    t = cell.text.strip()
+                    return t if t != "\xa0" and t != "" else ""
+                
+                lunes = clean(cells[3])
+                martes = clean(cells[4])
+                m1 = clean(cells[5])
+                jueves = clean(cells[6])
+                viernes = clean(cells[7])
+                sabado = clean(cells[8])
+                
+                horario.append({
+                    "materia": materia_text,
+                    "maestro": maestro_text,
+                    "grupo": grupo,
+                    "L": lunes,
+                    "M": martes,
+                    "M1": m1,
+                    "J": jueves,
+                    "V": viernes,
+                    "S": sabado
+                })
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -186,7 +235,8 @@ def login():
         "tutor": tutor,
         "institution": institution,
         "boleta": boleta,
-        "materias": subjects_data
+        "materias": subjects_data,
+        "horario": horario  # Se agrega el horario extraído
     }
     
     return jsonify(result)
