@@ -32,13 +32,13 @@ def login():
     service = Service(executable_path="/usr/local/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
     def accept_alert_if_present(driver, timeout=5):
-    try:
-        WebDriverWait(driver, timeout).until(EC.alert_is_present())
-        alert = driver.switch_to.alert
-        alert.accept()
-        print("Alerta aceptada correctamente.")
-    except TimeoutException:
-        print("No se mostró ninguna alerta.")
+        try:
+            WebDriverWait(driver, timeout).until(EC.alert_is_present())
+            alert = driver.switch_to.alert
+            alert.accept()
+            print("Alerta aceptada correctamente.")
+        except TimeoutException:
+            print("No se mostró ninguna alerta.")
     try:
         # 1. Iniciar sesión en la página principal
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
