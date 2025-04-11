@@ -34,7 +34,7 @@ def login():
     try:
         # 1. Iniciar sesión en la página principal
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 3)
         
         username_field = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr")))
         password_field = driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass")
