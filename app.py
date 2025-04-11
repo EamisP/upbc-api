@@ -12,8 +12,19 @@ import shutil
 
 app = Flask(__name__)
 
+def accept_alert_if_present(driver, timeout=5):
+    """Si aparece una alerta, la acepta; si no, continúa."""
+    try:
+        WebDriverWait(driver, timeout).until(EC.alert_is_present())
+        alert = driver.switch_to.alert
+        alert.accept()
+        print("Alerta aceptada correctamente.")
+    except TimeoutException:
+        # No se presentó alerta
+        pass
+
 def safe_text(driver, by, locator, default="Sin información", timeout=5):
-    """Intenta obtener el texto de un elemento; si no está o hay timeout, devuelve default."""
+    """Retorna el texto de un elemento o default si no se encuentra."""
     try:
         elem = WebDriverWait(driver, timeout).until(
             EC.presence_of_element_located((by, locator))
@@ -24,7 +35,7 @@ def safe_text(driver, by, locator, default="Sin información", timeout=5):
         return default
 
 def safe_find_elements(driver, by, locator, timeout=5):
-    """Intenta obtener una lista de elementos; si falla, devuelve lista vacía."""
+    """Retorna una lista de elementos o una lista vacía en caso de error."""
     try:
         WebDriverWait(driver, timeout).until(
             EC.presence_of_element_located((by, locator))
@@ -39,25 +50,34 @@ def login():
     username = data.get('username')
     password = data.get('password')
     
+    # Directorio temporal para el perfil de Chrome
     temp_dir = tempfile.mkdtemp()
+    
+    # Configurar Chrome en modo headless
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument(f"--user-data-dir={temp_dir}")
+    
     service = Service(executable_path="/usr/local/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
 
     try:
+        # 1. Login inicial
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/")
         wait = WebDriverWait(driver, 5)
-        # Login
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_tb_usr"))).send_keys(username)
         driver.find_element(By.ID, "ContentPlaceHolder1_tb_pass").send_keys(password)
         wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar"))).click()
-        time.sleep(1)
+        accept_alert_if_present(driver)  # Aceptar alerta post login
 
-        # Datos básicos con safe_text
+        # 2. Redireccionar a materias
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/npe_alu_materias.aspx")
+        accept_alert_if_present(driver)  # Aceptar alerta de redirect
+        time.sleep(1)
+        
+        # Datos básicos
         personal = {
             "name": safe_text(driver, By.ID, "ContentPlaceHolder1_lb_lnom"),
             "career": safe_text(driver, By.ID, "ContentPlaceHolder1_lb_lprog")
@@ -77,8 +97,8 @@ def login():
             "mail": safe_text(driver, By.ID, "ContentPlaceHolder1_lb_inst_email"),
             "password": safe_text(driver, By.ID, "ContentPlaceHolder1_lb_inst_clave")
         }
-
-        # Boleta
+        
+        # 3. Extraer la boleta (tabla)
         boleta = []
         rows = safe_find_elements(driver, By.CSS_SELECTOR, "#ContentPlaceHolder1_gv_hrsxsem tr")
         for fila in rows[1:]:
@@ -88,47 +108,144 @@ def login():
                 "calificacion": celdas[1].text.strip() if len(celdas) > 1 else "Sin información",
                 "cuatrimestre": celdas[2].text.strip() if len(celdas) > 2 else "Sin información"
             })
-
-        # Materias y unidades
-        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/npe_alu_materias.aspx")
-        time.sleep(2)
+        
+        # 4. Extraer información de materias y sus unidades
         subjects_data = []
-        links = safe_find_elements(driver, By.CSS_SELECTOR, "a[id^='ContentPlaceHolder1_gv1_lk_mat_desc_']")
-        for i, link in enumerate(links):
-            materia = link.text.strip() or "Sin información"
+        subject_links = safe_find_elements(driver, By.CSS_SELECTOR, "a[id^='ContentPlaceHolder1_gv1_lk_mat_desc_']")
+        num_subjects = len(subject_links)
+        
+        for i in range(num_subjects):
             try:
-                link.click()
-                time.sleep(1)
-                cal_final = safe_text(driver, By.ID, f"ContentPlaceHolder1_gv1_lb_califfinal_{i}")
-                # Unidades
+                subject_link = driver.find_element(By.ID, f"ContentPlaceHolder1_gv1_lk_mat_desc_{i}")
+                subject_name = subject_link.text.strip() or "Sin información"
+                
+                subject_link.click()
+                time.sleep(2)
+                
+                final_grade = safe_text(driver, By.ID, f"ContentPlaceHolder1_gv1_lb_califfinal_{i}")
+                
+                # Extraer las unidades si existen
                 unidades = []
-                rows_u = safe_find_elements(driver, By.CSS_SELECTOR, f"#ContentPlaceHolder1_gv1_dv_gv1x_{i} tr")[1:]
-                for row_u in rows_u:
-                    cols = row_u.find_elements(By.TAG_NAME, "td")
-                    unidades.append({
-                        "unidad": cols[0].text.strip() if len(cols)>0 else "Sin información",
-                        "descripcion": cols[1].text.strip() if len(cols)>1 else "Sin información",
-                        "calificacion": cols[2].text.strip() if len(cols)>2 else "Sin información",
-                    })
+                try:
+                    detail_div = driver.find_element(By.ID, f"ContentPlaceHolder1_gv1_dv_gv1x_{i}")
+                    table = detail_div.find_element(By.CSS_SELECTOR, "table[id^='ContentPlaceHolder1_gv1_gv1x_']")
+                    rows_unidades = table.find_elements(By.XPATH, ".//tr[position()>1]")
+                    for row in rows_unidades:
+                        cells = row.find_elements(By.TAG_NAME, "td")
+                        unidades.append({
+                            "unidad": cells[0].text.strip() if len(cells) > 0 else "Sin información",
+                            "descripcion": cells[1].text.strip() if len(cells) > 1 else "Sin información",
+                            "calificacion": cells[2].text.strip() if len(cells) > 2 else "Sin información"
+                        })
+                except Exception:
+                    unidades = []
+                
+                subjects_data.append({
+                    "materia": subject_name,
+                    "calificacion_final": final_grade,
+                    "unidades": unidades
+                })
             except Exception:
-                cal_final = "Sin información"
-                unidades = []
-            subjects_data.append({
-                "materia": materia,
-                "calificacion_final": cal_final,
-                "unidades": unidades
-            })
-
-        # ... (idéntica lógica para calificaciones especiales y horario,
-        #    usando safe_text y safe_find_elements donde haga falta,
-        #    y devolviendo "Sin información" como default)
-
+                continue
+        
+        # 5. Procesar calificaciones especiales (rpt_calificaciones.aspx)
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/rpt_calificaciones.aspx")
+        wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte")))
+        time.sleep(2)
+        
+        special_grades = []
+        for corte in ["1", "2", "3"]:
+            select_elem = Select(wait.until(EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder1$dd_corte"))))
+            select_elem.select_by_value(corte)
+            time.sleep(2)
+            try:
+                tr_nivel = wait.until(EC.presence_of_element_located((
+                    By.XPATH, "//tr[td[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'NIVEL')]]"
+                )))
+                tds = tr_nivel.find_elements(By.TAG_NAME, "td")
+                if tds:
+                    grade_text = tds[-1].text.strip()
+                    try:
+                        grade_val = float(grade_text) if grade_text != "" else 0.0
+                    except Exception:
+                        grade_val = 0.0
+                    special_grades.append(grade_val)
+                else:
+                    special_grades.append(0.0)
+            except Exception:
+                special_grades.append(0.0)
+        
+        if len(special_grades) == 3 and all(g > 0 for g in special_grades):
+            special_final = round(sum(special_grades) / 3, 2)
+            special_final_str = str(special_final)
+        else:
+            special_final_str = "N/A"
+        
+        special_subject = {
+            "materia": "INGLÉS",
+            "calificacion_final": special_final_str,
+            "unidades": [
+                {"unidad": "1", "descripcion": "Calificación corte 1", "calificacion": str(special_grades[0]) if len(special_grades) > 0 else "N/A"},
+                {"unidad": "2", "descripcion": "Calificación corte 2", "calificacion": str(special_grades[1]) if len(special_grades) > 1 else "N/A"},
+                {"unidad": "3", "descripcion": "Calificación corte 3", "calificacion": str(special_grades[2]) if len(special_grades) > 2 else "N/A"}
+            ]
+        }
+        subjects_data.append(special_subject)
+        
+        # 6. Obtener el horario (alu_horario.aspx)
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/alu_horario.aspx")
+        wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv_hrsxsem")))
+        time.sleep(2)
+        
+        horario = []
+        horario_tabla = driver.find_element(By.ID, "ContentPlaceHolder1_gv_hrsxsem")
+        rows = horario_tabla.find_elements(By.TAG_NAME, "tr")
+        # Se asume que la primera fila es el encabezado
+        for idx, row in enumerate(rows[1:]):
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 9:
+                try:
+                    materia_elem = cells[1].find_element(By.ID, f"ContentPlaceHolder1_gv_hrsxsem_lb_materia_{idx}")
+                    materia_text = materia_elem.text.strip()
+                except Exception:
+                    materia_text = cells[1].text.split("\n")[0].strip() or "Sin información"
+                try:
+                    maestro_elem = cells[1].find_element(By.ID, f"ContentPlaceHolder1_gv_hrsxsem_lb_maestro_{idx}")
+                    maestro_text = maestro_elem.text.strip()
+                except Exception:
+                    parts = cells[1].text.split("\n")
+                    maestro_text = parts[1].strip() if len(parts) > 1 else "Sin información"
+                
+                grupo = cells[2].text.strip() if cells[2].text.strip() else "Sin información"
+                def clean(cell):
+                    t = cell.text.strip()
+                    return t if t != "\xa0" and t != "" else "Sin información"
+                
+                lunes = clean(cells[3])
+                martes = clean(cells[4])
+                m1 = clean(cells[5])
+                jueves = clean(cells[6])
+                viernes = clean(cells[7])
+                sabado = clean(cells[8])
+                
+                horario.append({
+                    "materia": materia_text,
+                    "maestro": maestro_text,
+                    "grupo": grupo,
+                    "L": lunes,
+                    "M": martes,
+                    "M1": m1,
+                    "J": jueves,
+                    "V": viernes,
+                    "S": sabado
+                })
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         driver.quit()
         shutil.rmtree(temp_dir)
-
+    
     result = {
         "personal": personal,
         "address": address,
@@ -136,8 +253,9 @@ def login():
         "institution": institution,
         "boleta": boleta,
         "materias": subjects_data,
-        # "horario": horario,  etc.
+        "horario": horario
     }
+    
     return jsonify(result)
 
 if __name__ == '__main__':
