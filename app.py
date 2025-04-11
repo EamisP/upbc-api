@@ -43,6 +43,21 @@ def login():
         
         submit_button = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar")))
         submit_button.click()
+        try:
+            WebDriverWait(driver, 5).until(EC.alert_is_present())
+            alert = driver.switch_to.alert
+            alert.accept()
+            print("Alerta aceptada correctamente.")
+        except TimeoutException:
+            print("No se mostró ninguna alerta.")
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/npe_alu_materias.aspx")
+        try:
+            WebDriverWait(driver, 5).until(EC.alert_is_present())
+            alert = driver.switch_to.alert
+            alert.accept()
+            print("Alerta aceptada correctamente.")
+        except TimeoutException:
+            print("No se mostró ninguna alerta.")
         wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lb_lnom")))
         time.sleep(1)
         
