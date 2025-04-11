@@ -72,8 +72,8 @@ def login():
         wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_tb_aceptar"))).click()
         accept_alert_if_present(driver)  # Aceptar alerta post login
 
-        # 2. Redireccionar a materias
-        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/npe_alu_materias.aspx")
+        # 2. Redireccionar a datos personales
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/datos_personales.aspx")
         accept_alert_if_present(driver)  # Aceptar alerta de redirect
         time.sleep(1)
         
@@ -110,6 +110,9 @@ def login():
             })
         
         # 4. Extraer información de materias y sus unidades
+        driver.get("https://www2.upbc.edu.mx/alumnos/siaax/npe_alu_materias.aspx")
+        accept_alert_if_present(driver)  # Aceptar alerta de redirect
+        time.sleep(1)
         subjects_data = []
         subject_links = safe_find_elements(driver, By.CSS_SELECTOR, "a[id^='ContentPlaceHolder1_gv1_lk_mat_desc_']")
         num_subjects = len(subject_links)
