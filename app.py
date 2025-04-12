@@ -76,6 +76,8 @@ def login():
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/datos_personales.aspx")
         accept_alert_if_present(driver)  # Aceptar alerta de redirect
         time.sleep(1)
+        # Encuentra la imagen
+        img_element = driver.find_element(By.ID, "ContentPlaceHolder1_ImgFoto")
         img_base64 = driver.execute_script("""
             var img = arguments[0];
             var canvas = document.createElement('canvas');
