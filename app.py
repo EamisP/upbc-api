@@ -266,7 +266,7 @@ def login():
         "institution": institution,
         "boleta": boleta,
         "materias": subjects_data,
-        "horario": horario
+        "horario": horario,
         "foto_base64": img_base64
     }
     
