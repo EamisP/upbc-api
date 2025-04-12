@@ -6,6 +6,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+import base64
+import requests
+from urllib.parse import urljoin
 import time
 import tempfile
 import shutil
@@ -76,7 +79,14 @@ def login():
         driver.get("https://www2.upbc.edu.mx/alumnos/siaax/datos_personales.aspx")
         accept_alert_if_present(driver)  # Aceptar alerta de redirect
         time.sleep(1)
-        
+        # Justo después de cargar datos_personales.aspx
+        img_element = driver.find_element(By.ID, "ContentPlaceHolder1_ImgFoto")
+        img_src = img_element.get_attribute("src")  # ruta relativa, ej. "../Imagenes/..."
+        img_url = urljoin(driver.current_url, img_src)
+
+        # Descargar la imagen
+        response_img = requests.get(img_url)
+        img_base64 = base64.b64encode(response_img.content).decode('utf-8')
         # Datos básicos
         personal = {
             "name": safe_text(driver, By.ID, "ContentPlaceHolder1_lb_lnom"),
@@ -257,6 +267,7 @@ def login():
         "boleta": boleta,
         "materias": subjects_data,
         "horario": horario
+        "foto_base64": img_base64
     }
     
     return jsonify(result)
